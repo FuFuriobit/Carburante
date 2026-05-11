@@ -1,0 +1,717 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Tracker Auto</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Syne:wght@400;600;700;800&display=swap');
+  :root {
+    --bg:#0d0f14; --surface:#161820; --surface2:#1e2028; --border:#2a2d3a;
+    --accent:#e8ff47; --blue:#47c8ff; --red:#ff6b6b; --orange:#ffaa47;
+    --green:#47ffaa; --purple:#b09eff; --pink:#ff9eff; --text:#f0f2f8; --muted:#6b7080; --radius:14px;
+  }
+  * { box-sizing:border-box; margin:0; padding:0; }
+  body { background:var(--bg); color:var(--text); font-family:'Syne',sans-serif; min-height:100vh; padding-bottom:80px; }
+
+  header { background:var(--surface); border-bottom:1px solid var(--border); padding:16px 20px; display:flex; align-items:center; gap:12px; position:sticky; top:0; z-index:100; }
+  .logo { width:38px; height:38px; background:var(--accent); border-radius:10px; display:flex; align-items:center; justify-content:center; font-size:20px; }
+  header h1 { font-size:1.1rem; font-weight:800; letter-spacing:-0.5px; }
+  header span { font-size:0.7rem; color:var(--muted); font-family:'DM Mono',monospace; }
+
+  .tabs { display:flex; background:var(--surface); border-bottom:1px solid var(--border); overflow-x:auto; }
+  .tab { background:none; border:none; border-bottom:2px solid transparent; color:var(--muted); font-family:'Syne',sans-serif; font-weight:700; font-size:0.74rem; padding:11px 11px; cursor:pointer; white-space:nowrap; transition:all 0.2s; }
+  .tab.active { color:var(--accent); border-bottom-color:var(--accent); background:var(--surface2); }
+
+  .content { display:none; padding:18px; max-width:900px; margin:0 auto; }
+  .content.active { display:block; }
+
+  .stat-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(130px,1fr)); gap:10px; margin-bottom:20px; }
+  .stat-card { background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); padding:13px 14px; }
+  .stat-label { font-size:0.6rem; color:var(--muted); font-family:'DM Mono',monospace; text-transform:uppercase; letter-spacing:0.4px; margin-bottom:5px; }
+  .stat-value { font-size:1.3rem; font-weight:800; letter-spacing:-1px; line-height:1; }
+  .stat-sub { font-size:0.6rem; color:var(--muted); font-family:'DM Mono',monospace; margin-top:3px; }
+
+  .section-title { display:flex; align-items:center; gap:8px; font-size:0.9rem; font-weight:800; margin:22px 0 12px; }
+  .section-title::before { content:''; display:block; width:4px; height:16px; background:var(--accent); border-radius:2px; }
+
+  .form-card { background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); padding:18px; margin-bottom:14px; }
+  .form-card h2 { font-size:0.9rem; font-weight:700; margin-bottom:14px; display:flex; align-items:center; gap:8px; }
+  .form-card h2::before { content:''; display:block; width:4px; height:15px; background:var(--accent); border-radius:2px; }
+  .form-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:11px; }
+  .field label { display:block; font-size:0.6rem; color:var(--muted); font-family:'DM Mono',monospace; margin-bottom:4px; text-transform:uppercase; }
+  .field input, .field select, .field textarea { width:100%; background:var(--bg); border:1px solid var(--border); border-radius:8px; color:var(--text); font-family:'DM Mono',monospace; font-size:0.85rem; padding:8px 10px; outline:none; transition:border-color 0.2s; }
+  .field input:focus, .field select:focus, .field textarea:focus { border-color:var(--accent); }
+  .field textarea { resize:vertical; min-height:55px; }
+  .btn-primary { width:100%; margin-top:13px; background:var(--accent); color:#0d0f14; border:none; border-radius:10px; font-family:'Syne',sans-serif; font-weight:800; font-size:0.87rem; padding:11px; cursor:pointer; }
+
+  .chart-card { background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); padding:16px; margin-bottom:12px; }
+  .chart-card h3 { font-size:0.68rem; color:var(--muted); font-family:'DM Mono',monospace; text-transform:uppercase; margin-bottom:12px; }
+  .chart-wrap { position:relative; height:180px; }
+
+  /* MAINT CARDS DASHBOARD */
+  .maint-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(240px,1fr)); gap:11px; margin-bottom:18px; }
+  .maint-card { background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); padding:15px; }
+  .maint-card-header { display:flex; align-items:center; gap:10px; margin-bottom:11px; }
+  .maint-icon { width:32px; height:32px; border-radius:8px; display:flex; align-items:center; justify-content:center; font-size:16px; flex-shrink:0; }
+  .maint-title { font-weight:800; font-size:0.86rem; }
+  .maint-sub { font-size:0.62rem; color:var(--muted); font-family:'DM Mono',monospace; }
+  .maint-row { display:flex; justify-content:space-between; align-items:center; padding:4px 0; border-bottom:1px solid var(--border); }
+  .maint-row:last-of-type { border-bottom:none; }
+  .maint-key { color:var(--muted); font-family:'DM Mono',monospace; font-size:0.65rem; }
+  .maint-val { font-family:'DM Mono',monospace; font-size:0.74rem; font-weight:600; text-align:right; max-width:60%; word-break:break-word; }
+  .c-ok{color:var(--green);} .c-warn{color:var(--orange);} .c-exp{color:var(--red);}
+  .badge { display:inline-block; padding:3px 9px; border-radius:20px; font-size:0.61rem; font-family:'DM Mono',monospace; font-weight:700; margin-top:7px; }
+  .b-ok{background:rgba(71,255,170,0.1);color:var(--green);}
+  .b-warn{background:rgba(255,170,71,0.1);color:var(--orange);}
+  .b-exp{background:rgba(255,107,107,0.1);color:var(--red);}
+
+  /* HISTORY */
+  .history-list { display:flex; flex-direction:column; gap:9px; margin-bottom:16px; }
+  .history-item { background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); padding:13px 15px; }
+  .history-header { display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:9px; }
+  .history-date { font-family:'DM Mono',monospace; font-size:0.82rem; font-weight:600; }
+  .history-sub2 { font-size:0.63rem; color:var(--muted); font-family:'DM Mono',monospace; margin-top:2px; }
+  .history-tags { display:flex; flex-wrap:wrap; gap:5px; }
+  .tag { font-family:'DM Mono',monospace; font-size:0.66rem; padding:3px 7px; border-radius:5px; background:var(--bg); border:1px solid var(--border); }
+  .history-actions { display:flex; gap:5px; flex-shrink:0; }
+  .btn-sm { background:none; border:1px solid var(--border); color:var(--muted); border-radius:7px; padding:4px 8px; cursor:pointer; font-size:0.72rem; transition:all 0.2s; }
+  .btn-sm:hover { border-color:var(--accent); color:var(--accent); }
+  .btn-sm.del:hover { border-color:var(--red); color:var(--red); }
+
+  /* MODAL */
+  .modal-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.8); z-index:200; align-items:center; justify-content:center; padding:14px; }
+  .modal-overlay.open { display:flex; }
+  .modal { background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); padding:20px; width:100%; max-width:500px; max-height:92vh; overflow-y:auto; }
+  .modal h2 { font-size:0.9rem; font-weight:800; margin-bottom:14px; display:flex; align-items:center; gap:8px; }
+  .modal h2::before { content:''; display:block; width:4px; height:15px; background:var(--accent); border-radius:2px; }
+  .modal-btns { display:flex; gap:9px; margin-top:14px; }
+  .btn-save { flex:1; background:var(--accent); color:#0d0f14; border:none; border-radius:9px; font-family:'Syne',sans-serif; font-weight:800; font-size:0.86rem; padding:11px; cursor:pointer; }
+  .btn-cancel { flex:1; background:none; border:1px solid var(--border); color:var(--text); border-radius:9px; font-family:'Syne',sans-serif; font-weight:700; font-size:0.86rem; padding:11px; cursor:pointer; }
+
+  .toast { position:fixed; bottom:26px; left:50%; transform:translateX(-50%) translateY(80px); background:var(--accent); color:#0d0f14; font-weight:700; font-size:0.8rem; padding:10px 20px; border-radius:40px; z-index:999; transition:transform 0.3s cubic-bezier(.34,1.56,.64,1); pointer-events:none; white-space:nowrap; }
+  .toast.show { transform:translateX(-50%) translateY(0); }
+  .empty { text-align:center; padding:45px 20px; color:var(--muted); }
+  .empty .icon { font-size:2.6rem; margin-bottom:10px; }
+  .export-row { display:flex; gap:9px; margin-top:16px; }
+  .btn-outline { flex:1; background:none; border:1px solid var(--border); color:var(--text); font-family:'Syne',sans-serif; font-weight:600; font-size:0.74rem; padding:9px; border-radius:8px; cursor:pointer; transition:all 0.2s; }
+  .btn-outline:hover { border-color:var(--accent); color:var(--accent); }
+  .no-data { color:var(--muted); font-size:0.76rem; padding:6px 0; font-family:'DM Mono',monospace; }
+  .sub-section { font-size:0.78rem; font-weight:700; color:var(--muted); margin:18px 0 10px; font-family:'DM Mono',monospace; text-transform:uppercase; letter-spacing:0.5px; }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">🚗</div>
+  <div>
+    <h1>Tracker Auto</h1>
+    <span id="headerSub">pronto</span>
+  </div>
+</header>
+
+<div class="tabs">
+  <button class="tab active" onclick="switchTab('dashboard')">📊 Dashboard</button>
+  <button class="tab" onclick="switchTab('carburante')">⛽ Carburante</button>
+  <button class="tab" onclick="switchTab('manutenzione')">🔧 Manutenzione</button>
+  <button class="tab" onclick="switchTab('storico')">📋 Storico</button>
+</div>
+
+<!-- DASHBOARD -->
+<div id="tab-dashboard" class="content active">
+  <div class="section-title">⛽ Carburante</div>
+  <div class="stat-grid" id="statsGrid"></div>
+  <div id="chartsArea"></div>
+  <div class="section-title">🔧 Manutenzione &amp; Scadenze</div>
+  <div class="maint-grid" id="maintCards"></div>
+</div>
+
+<!-- CARBURANTE -->
+<div id="tab-carburante" class="content">
+  <div class="form-card">
+    <h2>Nuovo rifornimento</h2>
+    <div class="form-grid">
+      <div class="field"><label>Data</label><input type="date" id="inData"></div>
+      <div class="field"><label>Km contachilometri</label><input type="number" id="inKm" placeholder="es. 45230"></div>
+      <div class="field"><label>Litri riforniti</label><input type="number" id="inLitri" placeholder="es. 40.5" step="0.01"></div>
+      <div class="field"><label>Prezzo al litro (€)</label><input type="number" id="inPrezzoLitro" placeholder="es. 1.89" step="0.001"></div>
+      <div class="field"><label>Spesa totale (€) opz.</label><input type="number" id="inSpesa" placeholder="calcolata auto" step="0.01"></div>
+      <div class="field"><label>Tipo carburante</label>
+        <select id="inTipo"><option>Benzina</option><option>Diesel</option><option>GPL</option><option>Metano</option><option>Elettrico</option></select>
+      </div>
+    </div>
+    <button class="btn-primary" onclick="aggiungiRifornimento()">Aggiungi rifornimento</button>
+  </div>
+</div>
+
+<!-- MANUTENZIONE -->
+<div id="tab-manutenzione" class="content">
+
+  <!-- MANUTENZIONE -->
+  <div class="form-card">
+    <h2>🔧 Nuova manutenzione</h2>
+    <div class="form-grid">
+      <div class="field"><label>Data intervento</label><input type="date" id="mData"></div>
+      <div class="field"><label>Tipo intervento</label><input type="text" id="mTipo" placeholder="es. Tagliando, Freni..."></div>
+      <div class="field"><label>Km al momento</label><input type="number" id="mKm" placeholder="es. 45000"></div>
+      <div class="field"><label>Costo (€)</label><input type="number" id="mCosto" step="0.01"></div>
+      <div class="field"><label>Prossima scadenza (data)</label><input type="date" id="mScadData"></div>
+      <div class="field"><label>Prossima scadenza (km)</label><input type="number" id="mScadKm" placeholder="es. 60000"></div>
+      <div class="field" style="grid-column:1/-1"><label>Note</label><textarea id="mNote" placeholder="Officina, ricambi..."></textarea></div>
+    </div>
+    <button class="btn-primary" onclick="aggiungiVoce('maint')">Aggiungi manutenzione</button>
+  </div>
+  <div class="sub-section">Storico manutenzioni</div>
+  <div id="listMaint"></div>
+
+  <!-- REVISIONE -->
+  <div class="form-card">
+    <h2>🔍 Revisione</h2>
+    <div class="form-grid">
+      <div class="field"><label>Data revisione</label><input type="date" id="rData"></div>
+      <div class="field"><label>Costo (€)</label><input type="number" id="rCosto" step="0.01"></div>
+      <div class="field"><label>Prossima revisione</label><input type="date" id="rScad"></div>
+      <div class="field"><label>Note</label><input type="text" id="rNote" placeholder="Officina, esito..."></div>
+    </div>
+    <button class="btn-primary" onclick="aggiungiVoce('rev')">Aggiungi revisione</button>
+  </div>
+  <div class="sub-section">Storico revisioni</div>
+  <div id="listRev"></div>
+
+  <!-- GOMME -->
+  <div class="form-card">
+    <h2>🔄 Cambio gomme</h2>
+    <div class="form-grid">
+      <div class="field"><label>Data cambio</label><input type="date" id="gData"></div>
+      <div class="field"><label>Tipo gomme</label>
+        <select id="gTipo"><option>Estive</option><option>Invernali</option><option>4 stagioni</option></select>
+      </div>
+      <div class="field"><label>Marca / Modello</label><input type="text" id="gMarca" placeholder="es. Michelin Pilot"></div>
+      <div class="field"><label>Misura</label><input type="text" id="gMisura" placeholder="es. 205/55 R16"></div>
+      <div class="field"><label>Km al momento</label><input type="number" id="gKm"></div>
+      <div class="field"><label>Costo (€)</label><input type="number" id="gCosto" step="0.01"></div>
+      <div class="field"><label>Prossimo cambio</label><input type="date" id="gScad"></div>
+      <div class="field"><label>Note</label><input type="text" id="gNote"></div>
+    </div>
+    <button class="btn-primary" onclick="aggiungiVoce('tires')">Aggiungi cambio gomme</button>
+  </div>
+  <div class="sub-section">Storico gomme</div>
+  <div id="listTires"></div>
+
+  <!-- BOLLO -->
+  <div class="form-card">
+    <h2>📋 Bollo auto</h2>
+    <div class="form-grid">
+      <div class="field"><label>Anno competenza</label><input type="number" id="bAnno" placeholder="es. 2025"></div>
+      <div class="field"><label>Importo (€)</label><input type="number" id="bImporto" step="0.01"></div>
+      <div class="field"><label>Data pagamento</label><input type="date" id="bData"></div>
+      <div class="field"><label>Scadenza prossimo</label><input type="date" id="bScad"></div>
+    </div>
+    <button class="btn-primary" onclick="aggiungiVoce('tax')">Aggiungi bollo</button>
+  </div>
+  <div class="sub-section">Storico bolli</div>
+  <div id="listTax"></div>
+
+  <!-- ASSICURAZIONE -->
+  <div class="form-card">
+    <h2>🛡️ Assicurazione</h2>
+    <div class="form-grid">
+      <div class="field"><label>Compagnia</label><input type="text" id="aComp" placeholder="es. Generali, UnipolSai..."></div>
+      <div class="field"><label>Tipo polizza</label>
+        <select id="aTipo"><option>RC Auto</option><option>Kasko</option><option>Mini Kasko</option><option>RC + Kasko</option></select>
+      </div>
+      <div class="field"><label>Importo (€)</label><input type="number" id="aImporto" step="0.01"></div>
+      <div class="field"><label>Data inizio</label><input type="date" id="aInizio"></div>
+      <div class="field"><label>Data scadenza</label><input type="date" id="aScad"></div>
+      <div class="field"><label>Numero polizza</label><input type="text" id="aNumero" placeholder="opzionale"></div>
+      <div class="field"><label>Note</label><input type="text" id="aNote" placeholder="Broker, massimale..."></div>
+    </div>
+    <button class="btn-primary" onclick="aggiungiVoce('ins')">Aggiungi assicurazione</button>
+  </div>
+  <div class="sub-section">Storico assicurazioni</div>
+  <div id="listIns"></div>
+
+</div>
+
+<!-- STORICO CARBURANTE -->
+<div id="tab-storico" class="content">
+  <div id="storicoCarburante"></div>
+  <div class="export-row">
+    <button class="btn-outline" onclick="esportaCSV()">⬇ Esporta CSV</button>
+    <button class="btn-outline" onclick="document.getElementById('csvInput').click()">⬆ Importa CSV</button>
+    <input type="file" id="csvInput" accept=".csv" style="display:none" onchange="leggiCSV(event)">
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<!-- MODAL GENERICO -->
+<div class="modal-overlay" id="modalOverlay">
+  <div class="modal">
+    <h2 id="modalTitle">Modifica</h2>
+    <div id="modalBody"></div>
+    <div class="modal-btns">
+      <button class="btn-cancel" onclick="chiudiModal()">Annulla</button>
+      <button class="btn-save" onclick="salvaModifica()">✓ Salva</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const KEYS={fuel:'carburante_v1',maint:'manutenzione_v1',rev:'revisioni_v1',tires:'gomme_v1',tax:'bollo_v1',ins:'assicurazione_v1'};
+function ld(k){try{return JSON.parse(localStorage.getItem(k))||[];}catch{return[];}}
+function sv(k,v){localStorage.setItem(k,JSON.stringify(v));}
+function today(){return new Date().toISOString().slice(0,10);}
+function fmtDate(iso){if(!iso)return'—';const[y,m,d]=iso.split('-');return`${d}/${m}/${y}`;}
+function showToast(msg){const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2500);}
+function daysUntil(iso){if(!iso)return null;return Math.ceil((new Date(iso)-new Date())/86400000);}
+function scadCls(d){if(d===null)return'';return d<0?'c-exp':d<30?'c-warn':'c-ok';}
+function badgeCls(d){if(d===null)return'';return d<0?'b-exp':d<30?'b-warn':'b-ok';}
+function badgeLbl(d){if(d===null)return'';if(d<0)return`⚠ Scaduto ${Math.abs(d)}gg fa`;if(d===0)return'⚠ Scade oggi!';if(d<30)return`⚠ Scade tra ${d} giorni`;return`✓ Scade tra ${d} giorni`;}
+function fld(label,id,type='text',ph='',extra=''){return`<div class="field"><label>${label}</label><input type="${type}" id="${id}" placeholder="${ph}" ${extra}></div>`;}
+function fldSel(label,id,opts){return`<div class="field"><label>${label}</label><select id="${id}">${opts.map(o=>`<option>${o}</option>`).join('')}</select></div>`;}
+
+const TAB_IDS=['dashboard','carburante','manutenzione','storico'];
+function switchTab(name){
+  document.querySelectorAll('.tab').forEach((t,i)=>t.classList.toggle('active',TAB_IDS[i]===name));
+  document.querySelectorAll('.content').forEach(c=>c.classList.remove('active'));
+  document.getElementById('tab-'+name).classList.add('active');
+  if(name==='dashboard')renderDashboard();
+  if(name==='storico')renderStorico();
+  if(name==='manutenzione')renderAllMaintLists();
+}
+
+// ── CARBURANTE ────────────────────────────────────────────────────────────────
+function calcolaRows(arr){
+  const s=[...arr].sort((a,b)=>new Date(a.data)-new Date(b.data));
+  return s.map((r,i)=>{
+    const prev=s[i-1];
+    const kmP=prev?r.km-prev.km:null;
+    const consumo=kmP&&r.litri?+(kmP/r.litri).toFixed(2):null;
+    const costoKm=kmP&&r.spesa?+(r.spesa/kmP).toFixed(4):null;
+    return{...r,kmPercorsi:kmP,consumo,costoKm};
+  });
+}
+function aggiungiRifornimento(){
+  const data=document.getElementById('inData').value;
+  const km=parseFloat(document.getElementById('inKm').value);
+  const litri=parseFloat(document.getElementById('inLitri').value);
+  const pLitro=parseFloat(document.getElementById('inPrezzoLitro').value);
+  const spesa=parseFloat(document.getElementById('inSpesa').value)||+(litri*pLitro).toFixed(2);
+  const tipo=document.getElementById('inTipo').value;
+  if(!data||isNaN(km)||isNaN(litri)||isNaN(pLitro)){showToast('⚠ Compila data, km, litri e prezzo/L');return;}
+  const arr=ld(KEYS.fuel);arr.push({data,km,litri,pLitro,spesa,tipo});sv(KEYS.fuel,arr);
+  ['inKm','inLitri','inPrezzoLitro','inSpesa'].forEach(id=>document.getElementById(id).value='');
+  showToast('✓ Rifornimento salvato!');switchTab('dashboard');
+}
+
+// ── AGGIUNGI VOCI MANUTENZIONE ────────────────────────────────────────────────
+const GETTERS={
+  maint:()=>({data:v('mData'),tipo:v('mTipo'),km:n('mKm'),costo:n('mCosto'),scadData:v('mScadData'),scadKm:n('mScadKm'),note:v('mNote')}),
+  rev:()=>({data:v('rData'),costo:n('rCosto'),scad:v('rScad'),note:v('rNote')}),
+  tires:()=>({data:v('gData'),tipo:v('gTipo'),marca:v('gMarca'),misura:v('gMisura'),km:n('gKm'),costo:n('gCosto'),scad:v('gScad'),note:v('gNote')}),
+  tax:()=>({anno:v('bAnno'),importo:n('bImporto'),data:v('bData'),scad:v('bScad')}),
+  ins:()=>({comp:v('aComp'),tipo:v('aTipo'),importo:n('aImporto'),inizio:v('aInizio'),scad:v('aScad'),numero:v('aNumero'),note:v('aNote')}),
+};
+const CLEARERS={
+  maint:['mData','mTipo','mKm','mCosto','mScadData','mScadKm','mNote'],
+  rev:['rData','rCosto','rScad','rNote'],
+  tires:['gData','gMarca','gMisura','gKm','gCosto','gScad','gNote'],
+  tax:['bAnno','bImporto','bData','bScad'],
+  ins:['aComp','aImporto','aInizio','aScad','aNumero','aNote'],
+};
+const VALIDATORS={
+  maint:d=>d.data&&d.tipo,rev:d=>d.data,tires:d=>d.data,tax:d=>d.anno,ins:d=>d.inizio&&d.scad
+};
+const LABELS={maint:'Manutenzione',rev:'Revisione',tires:'Cambio gomme',tax:'Bollo',ins:'Assicurazione'};
+
+function v(id){const el=document.getElementById(id);return el?el.value:'';}
+function n(id){const val=parseFloat(v(id));return isNaN(val)?null:val;}
+
+function aggiungiVoce(type){
+  const d=GETTERS[type]();
+  if(!VALIDATORS[type](d)){showToast('⚠ Compila i campi obbligatori');return;}
+  const arr=ld(KEYS[type]);arr.push(d);sv(KEYS[type],arr);
+  CLEARERS[type].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+  showToast(`✓ ${LABELS[type]} salvata!`);
+  renderAllMaintLists();
+  renderMaintCards();
+}
+
+// ── RENDER STORICO MANUTENZIONI ────────────────────────────────────────────────
+function renderAllMaintLists(){
+  renderMaintList('maint','listMaint');
+  renderMaintList('rev','listRev');
+  renderMaintList('tires','listTires');
+  renderMaintList('tax','listTax');
+  renderMaintList('ins','listIns');
+}
+
+function itemTags(type,r){
+  switch(type){
+    case 'maint': return[
+      r.data?`<span class="tag">${fmtDate(r.data)}</span>`:'',
+      r.tipo?`<span class="tag" style="color:var(--orange)">${r.tipo}</span>`:'',
+      r.km?`<span class="tag">📍 ${r.km.toLocaleString()} km</span>`:'',
+      r.costo?`<span class="tag" style="color:var(--accent)">€${r.costo.toFixed(2)}</span>`:'',
+      r.scadData?`<span class="tag" style="color:${r.scadData?scadColor(daysUntil(r.scadData)):'var(--muted)'}">⏰ ${fmtDate(r.scadData)}</span>`:'',
+      r.scadKm?`<span class="tag">→ ${r.scadKm.toLocaleString()} km</span>`:'',
+      r.note?`<span class="tag" style="color:var(--muted)">${r.note}</span>`:'',
+    ];
+    case 'rev': return[
+      r.data?`<span class="tag">${fmtDate(r.data)}</span>`:'',
+      r.costo?`<span class="tag" style="color:var(--accent)">€${r.costo.toFixed(2)}</span>`:'',
+      r.scad?`<span class="tag" style="color:${scadColor(daysUntil(r.scad))}">⏰ ${fmtDate(r.scad)}</span>`:'',
+      r.note?`<span class="tag" style="color:var(--muted)">${r.note}</span>`:'',
+    ];
+    case 'tires': return[
+      r.data?`<span class="tag">${fmtDate(r.data)}</span>`:'',
+      r.tipo?`<span class="tag" style="color:var(--purple)">${r.tipo}</span>`:'',
+      r.marca?`<span class="tag">${r.marca}</span>`:'',
+      r.misura?`<span class="tag">${r.misura}</span>`:'',
+      r.costo?`<span class="tag" style="color:var(--accent)">€${r.costo.toFixed(2)}</span>`:'',
+      r.scad?`<span class="tag" style="color:${scadColor(daysUntil(r.scad))}">⏰ ${fmtDate(r.scad)}</span>`:'',
+    ];
+    case 'tax': return[
+      r.anno?`<span class="tag">${r.anno}</span>`:'',
+      r.importo?`<span class="tag" style="color:var(--accent)">€${r.importo.toFixed(2)}</span>`:'',
+      r.data?`<span class="tag">Pagato ${fmtDate(r.data)}</span>`:'',
+      r.scad?`<span class="tag" style="color:${scadColor(daysUntil(r.scad))}">⏰ ${fmtDate(r.scad)}</span>`:'',
+    ];
+    case 'ins': return[
+      r.comp?`<span class="tag" style="color:var(--pink)">${r.comp}</span>`:'',
+      r.tipo?`<span class="tag">${r.tipo}</span>`:'',
+      r.importo?`<span class="tag" style="color:var(--accent)">€${r.importo.toFixed(2)}</span>`:'',
+      r.inizio?`<span class="tag">${fmtDate(r.inizio)}</span>`:'',
+      r.scad?`<span class="tag" style="color:${scadColor(daysUntil(r.scad))}">⏰ ${fmtDate(r.scad)}</span>`:'',
+      r.numero?`<span class="tag" style="color:var(--muted)">N° ${r.numero}</span>`:'',
+    ];
+  }
+  return[];
+}
+
+function scadColor(d){if(d===null)return'var(--muted)';return d<0?'var(--red)':d<30?'var(--orange)':'var(--green)';}
+
+function renderMaintList(type,elId){
+  const arr=ld(KEYS[type]);
+  const el=document.getElementById(elId);
+  if(!el)return;
+  if(!arr.length){el.innerHTML=`<div class="no-data" style="margin-bottom:14px">Nessun dato inserito.</div>`;return;}
+  const sorted=[...arr].map((r,i)=>({...r,_orig:i})).sort((a,b)=>{
+    const da=a.data||a.inizio||a.anno||'';
+    const db=b.data||b.inizio||b.anno||'';
+    return db>da?1:-1;
+  });
+  el.innerHTML='<div class="history-list">'+sorted.map((r,i)=>{
+    const tags=itemTags(type,r).filter(Boolean).join('');
+    const label=r.tipo||r.comp||r.anno||fmtDate(r.data)||'—';
+    const sub=r.note||r.numero||'';
+    return`<div class="history-item">
+      <div class="history-header">
+        <div>
+          <div class="history-date">${label}</div>
+          ${sub?`<div class="history-sub2">${sub}</div>`:''}
+        </div>
+        <div class="history-actions">
+          <button class="btn-sm" onclick="apriModificaVoce('${type}',${r._orig})">✏️</button>
+          <button class="btn-sm del" onclick="eliminaVoce('${type}',${r._orig})">✕</button>
+        </div>
+      </div>
+      <div class="history-tags">${tags}</div>
+    </div>`;
+  }).join('')+'</div>';
+}
+
+function eliminaVoce(type,idx){
+  if(!confirm('Eliminare questa voce?'))return;
+  const arr=ld(KEYS[type]);arr.splice(idx,1);sv(KEYS[type],arr);
+  renderMaintList(type,'list'+type.charAt(0).toUpperCase()+type.slice(1));
+  renderMaintCards();showToast('Voce eliminata');
+}
+
+// ── MODAL MODIFICA GENERICO ───────────────────────────────────────────────────
+let _editType=null,_editIdx=null;
+
+const MODAL_FORMS={
+  maint:(r)=>`<div class="form-grid">
+    ${fld('Data','e_mData','date')}
+    ${fld('Tipo intervento','e_mTipo','text','es. Tagliando')}
+    ${fld('Km al momento','e_mKm','number')}
+    ${fld('Costo (€)','e_mCosto','number')}
+    ${fld('Prossima scadenza data','e_mScadData','date')}
+    ${fld('Prossima scadenza km','e_mScadKm','number')}
+    <div class="field" style="grid-column:1/-1"><label>Note</label><textarea id="e_mNote"></textarea></div>
+  </div>`,
+  rev:(r)=>`<div class="form-grid">
+    ${fld('Data revisione','e_rData','date')}
+    ${fld('Costo (€)','e_rCosto','number')}
+    ${fld('Prossima revisione','e_rScad','date')}
+    ${fld('Note','e_rNote','text')}
+  </div>`,
+  tires:(r)=>`<div class="form-grid">
+    ${fld('Data cambio','e_gData','date')}
+    ${fldSel('Tipo gomme','e_gTipo',['Estive','Invernali','4 stagioni'])}
+    ${fld('Marca / Modello','e_gMarca','text')}
+    ${fld('Misura','e_gMisura','text','es. 205/55 R16')}
+    ${fld('Km al momento','e_gKm','number')}
+    ${fld('Costo (€)','e_gCosto','number')}
+    ${fld('Prossimo cambio','e_gScad','date')}
+    ${fld('Note','e_gNote','text')}
+  </div>`,
+  tax:(r)=>`<div class="form-grid">
+    ${fld('Anno competenza','e_bAnno','number')}
+    ${fld('Importo (€)','e_bImporto','number')}
+    ${fld('Data pagamento','e_bData','date')}
+    ${fld('Scadenza prossimo','e_bScad','date')}
+  </div>`,
+  ins:(r)=>`<div class="form-grid">
+    ${fld('Compagnia','e_aComp','text')}
+    ${fldSel('Tipo polizza','e_aTipo',['RC Auto','Kasko','Mini Kasko','RC + Kasko'])}
+    ${fld('Importo (€)','e_aImporto','number')}
+    ${fld('Data inizio','e_aInizio','date')}
+    ${fld('Data scadenza','e_aScad','date')}
+    ${fld('Numero polizza','e_aNumero','text')}
+    ${fld('Note','e_aNote','text')}
+  </div>`,
+};
+
+const MODAL_FILL={
+  maint:(r)=>{sv2('e_mData',r.data);sv2('e_mTipo',r.tipo);sv2('e_mKm',r.km);sv2('e_mCosto',r.costo);sv2('e_mScadData',r.scadData);sv2('e_mScadKm',r.scadKm);sv2('e_mNote',r.note);},
+  rev:(r)=>{sv2('e_rData',r.data);sv2('e_rCosto',r.costo);sv2('e_rScad',r.scad);sv2('e_rNote',r.note);},
+  tires:(r)=>{sv2('e_gData',r.data);sv2('e_gTipo',r.tipo);sv2('e_gMarca',r.marca);sv2('e_gMisura',r.misura);sv2('e_gKm',r.km);sv2('e_gCosto',r.costo);sv2('e_gScad',r.scad);sv2('e_gNote',r.note);},
+  tax:(r)=>{sv2('e_bAnno',r.anno);sv2('e_bImporto',r.importo);sv2('e_bData',r.data);sv2('e_bScad',r.scad);},
+  ins:(r)=>{sv2('e_aComp',r.comp);sv2('e_aTipo',r.tipo);sv2('e_aImporto',r.importo);sv2('e_aInizio',r.inizio);sv2('e_aScad',r.scad);sv2('e_aNumero',r.numero);sv2('e_aNote',r.note);},
+};
+
+const MODAL_READ={
+  maint:()=>({data:v('e_mData'),tipo:v('e_mTipo'),km:n2('e_mKm'),costo:n2('e_mCosto'),scadData:v('e_mScadData'),scadKm:n2('e_mScadKm'),note:v('e_mNote')}),
+  rev:()=>({data:v('e_rData'),costo:n2('e_rCosto'),scad:v('e_rScad'),note:v('e_rNote')}),
+  tires:()=>({data:v('e_gData'),tipo:v('e_gTipo'),marca:v('e_gMarca'),misura:v('e_gMisura'),km:n2('e_gKm'),costo:n2('e_gCosto'),scad:v('e_gScad'),note:v('e_gNote')}),
+  tax:()=>({anno:v('e_bAnno'),importo:n2('e_bImporto'),data:v('e_bData'),scad:v('e_bScad')}),
+  ins:()=>({comp:v('e_aComp'),tipo:v('e_aTipo'),importo:n2('e_aImporto'),inizio:v('e_aInizio'),scad:v('e_aScad'),numero:v('e_aNumero'),note:v('e_aNote')}),
+};
+
+function sv2(id,val){const el=document.getElementById(id);if(el&&val!==null&&val!==undefined)el.value=val;}
+function n2(id){const val=parseFloat(v(id));return isNaN(val)?null:val;}
+
+const LIST_IDS={maint:'listMaint',rev:'listRev',tires:'listTires',tax:'listTax',ins:'listIns'};
+const MODAL_TITLES={maint:'🔧 Modifica manutenzione',rev:'🔍 Modifica revisione',tires:'🔄 Modifica gomme',tax:'📋 Modifica bollo',ins:'🛡️ Modifica assicurazione'};
+
+function apriModificaVoce(type,idx){
+  _editType=type;_editIdx=idx;
+  const r=ld(KEYS[type])[idx];
+  document.getElementById('modalTitle').textContent=MODAL_TITLES[type];
+  document.getElementById('modalBody').innerHTML=MODAL_FORMS[type](r);
+  MODAL_FILL[type](r);
+  document.getElementById('modalOverlay').classList.add('open');
+}
+
+function chiudiModal(){document.getElementById('modalOverlay').classList.remove('open');_editType=null;_editIdx=null;}
+
+function salvaModifica(){
+  if(_editType==='fuel'){salvaModificaFuel();return;}
+  if(_editType===null)return;
+  const arr=ld(KEYS[_editType]);
+  arr[_editIdx]=MODAL_READ[_editType]();
+  sv(KEYS[_editType],arr);
+  chiudiModal();
+  renderMaintList(_editType,LIST_IDS[_editType]);
+  renderMaintCards();
+  showToast('✓ Modifiche salvate!');
+}
+
+// ── MODAL MODIFICA CARBURANTE ─────────────────────────────────────────────────
+function apriModifica(idx){
+  _editType='fuel';_editIdx=idx;
+  const arr=ld(KEYS.fuel);
+  const sorted=[...arr].sort((a,b)=>new Date(a.data)-new Date(b.data));
+  const r=sorted[idx];
+  document.getElementById('modalTitle').textContent='⛽ Modifica rifornimento';
+  document.getElementById('modalBody').innerHTML=`<div class="form-grid">
+    ${fld('Data','e_fData','date')}
+    ${fld('Km contachilometri','e_fKm','number')}
+    ${fld('Litri','e_fLitri','number')}
+    ${fld('Prezzo/L (€)','e_fPLitro','number')}
+    ${fld('Spesa totale (€)','e_fSpesa','number')}
+    ${fldSel('Tipo','e_fTipo',['Benzina','Diesel','GPL','Metano','Elettrico'])}
+  </div>`;
+  setTimeout(()=>{
+    sv2('e_fData',r.data);sv2('e_fKm',r.km);sv2('e_fLitri',r.litri);
+    sv2('e_fPLitro',r.pLitro);sv2('e_fSpesa',r.spesa);sv2('e_fTipo',r.tipo);
+  },50);
+  document.getElementById('modalOverlay').classList.add('open');
+}
+
+function salvaModificaFuel(){
+  const data=v('e_fData'),km=n2('e_fKm'),litri=n2('e_fLitri'),pLitro=n2('e_fPLitro');
+  const spesa=n2('e_fSpesa')||+(litri*pLitro).toFixed(2);
+  const tipo=v('e_fTipo');
+  if(!data||!km||!litri||!pLitro){showToast('⚠ Compila tutti i campi');return;}
+  const arr=ld(KEYS.fuel);
+  const sorted=[...arr].sort((a,b)=>new Date(a.data)-new Date(b.data));
+  arr[arr.indexOf(sorted[_editIdx])]={data,km,litri,pLitro,spesa,tipo};
+  sv(KEYS.fuel,arr);chiudiModal();renderStorico();showToast('✓ Modifiche salvate!');
+}
+
+// ── RENDER DASHBOARD ──────────────────────────────────────────────────────────
+let charts={};
+function destroyCharts(){Object.values(charts).forEach(c=>c.destroy());charts={};}
+
+function renderDashboard(){
+  const arr=ld(KEYS.fuel);
+  document.getElementById('headerSub').textContent=arr.length+' rifornimenti registrati';
+  const grid=document.getElementById('statsGrid');
+  if(!arr.length){
+    grid.innerHTML='<div class="empty" style="grid-column:1/-1"><div class="icon">📭</div><p>Nessun dato. Vai su <strong>Carburante</strong>!</p></div>';
+    destroyCharts();document.getElementById('chartsArea').innerHTML='';
+  } else {
+    const rows=calcolaRows(arr);
+    const validi=rows.filter(r=>r.kmPercorsi>0);
+    const totalKm=validi.reduce((s,r)=>s+r.kmPercorsi,0);
+    const totalSpesa=arr.reduce((s,r)=>s+r.spesa,0);
+    const totalLitri=arr.reduce((s,r)=>s+r.litri,0);
+    const avgC=validi.length?validi.reduce((s,r)=>s+r.consumo,0)/validi.length:0;
+    const avgP=arr.reduce((s,r)=>s+r.pLitro,0)/arr.length;
+    const vck=validi.filter(r=>r.costoKm);
+    const avgCK=vck.length?vck.reduce((s,r)=>s+r.costoKm,0)/vck.length:0;
+    grid.innerHTML=[
+      {l:'Km totali',v:totalKm.toFixed(0),sub:`${arr.length} rifornimenti`,c:'var(--blue)'},
+      {l:'Spesa totale',v:`€${totalSpesa.toFixed(2)}`,sub:`${totalLitri.toFixed(1)} L`,c:'var(--accent)'},
+      {l:'Consumo medio',v:avgC?`${avgC.toFixed(2)}`:'—',sub:'km/L',c:'var(--text)'},
+      {l:'Prezzo medio',v:`€${avgP.toFixed(3)}`,sub:'per litro',c:'var(--red)'},
+      {l:'Costo/km',v:avgCK?`€${avgCK.toFixed(3)}`:'—',sub:'media',c:'var(--purple)'},
+    ].map(s=>`<div class="stat-card"><div class="stat-label">${s.l}</div><div class="stat-value" style="color:${s.c}">${s.v}</div><div class="stat-sub">${s.sub}</div></div>`).join('');
+    destroyCharts();
+    const l1=rows.slice(1).map(r=>fmtDate(r.data)),la=rows.map(r=>fmtDate(r.data));
+    const cDefs=[
+      {id:'ch1',title:'⛽ Consumo (km/L)',labels:l1,data:rows.slice(1).map(r=>r.consumo),color:'#ff6b6b'},
+      {id:'ch2',title:'💶 Spesa (€)',labels:la,data:rows.map(r=>+r.spesa.toFixed(2)),color:'#e8ff47'},
+      {id:'ch3',title:'🛣 Km per rifornimento',labels:l1,data:rows.slice(1).map(r=>r.kmPercorsi),color:'#47c8ff'},
+      {id:'ch4',title:'📈 Prezzo €/L',labels:la,data:rows.map(r=>r.pLitro),color:'#b09eff'},
+    ];
+    document.getElementById('chartsArea').innerHTML=cDefs.map(c=>`<div class="chart-card"><h3>${c.title}</h3><div class="chart-wrap"><canvas id="${c.id}"></canvas></div></div>`).join('');
+    cDefs.forEach(c=>{
+      charts[c.id]=new Chart(document.getElementById(c.id),{type:'line',
+        data:{labels:c.labels,datasets:[{data:c.data,borderColor:c.color,backgroundColor:c.color+'22',tension:0.4,fill:true,pointRadius:4,pointBackgroundColor:c.color,spanGaps:true}]},
+        options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},
+          scales:{x:{ticks:{color:'#6b7080',font:{size:10},maxRotation:45},grid:{color:'#1e2028'}},
+                  y:{ticks:{color:'#6b7080',font:{size:10}},grid:{color:'#1e2028'}}}}});
+    });
+  }
+  renderMaintCards();
+}
+
+function renderMaintCards(){
+  function getLatest(key,sortField){
+    const arr=ld(KEYS[key]);
+    if(!arr.length)return null;
+    return arr.slice().sort((a,b)=>{
+      const da=a[sortField]||''; const db=b[sortField]||'';
+      return db>da?1:-1;
+    })[0];
+  }
+  function card(icon,bg,title,count,rows,scadDays){
+    const badge=scadDays!==null&&scadDays!==undefined?`<span class="badge ${badgeCls(scadDays)}">${badgeLbl(scadDays)}</span>`:'';
+    const body=rows.length
+      ?rows.map(r=>`<div class="maint-row"><span class="maint-key">${r.k}</span><span class="maint-val ${r.cls||''}">${r.v}</span></div>`).join('')+badge
+      :`<div class="no-data">Nessun dato ancora</div>`;
+    return`<div class="maint-card">
+      <div class="maint-card-header"><div class="maint-icon" style="background:${bg}">${icon}</div>
+      <div><div class="maint-title">${title}</div><div class="maint-sub">${count}</div></div></div>
+      ${body}</div>`;
+  }
+
+  const lm=getLatest('maint','data'); const dm=lm?daysUntil(lm.scadData):null;
+  const lr=getLatest('rev','data');   const dr=lr?daysUntil(lr.scad):null;
+  const lt=getLatest('tires','data'); const dt=lt?daysUntil(lt.scad):null;
+  const lb=getLatest('tax','anno');   const db=lb?daysUntil(lb.scad):null;
+  const li=getLatest('ins','inizio'); const di=li?daysUntil(li.scad):null;
+
+  document.getElementById('maintCards').innerHTML=
+    card('🔧','rgba(255,170,71,0.1)','Manutenzione',`${ld(KEYS.maint).length} interventi`,lm?[
+      {k:'Ultimo',v:fmtDate(lm.data)},{k:'Tipo',v:lm.tipo},
+      ...(lm.costo?[{k:'Costo',v:`€${lm.costo.toFixed(2)}`}]:[]),
+      ...(lm.scadData?[{k:'Prossima',v:fmtDate(lm.scadData),cls:scadCls(dm)}]:[]),
+      ...(lm.scadKm?[{k:'Entro km',v:lm.scadKm.toLocaleString()}]:[]),
+    ]:[],dm)+
+    card('🔍','rgba(71,200,255,0.1)','Revisione',`${ld(KEYS.rev).length} revisioni`,lr?[
+      {k:'Ultima',v:fmtDate(lr.data)},
+      ...(lr.costo?[{k:'Costo',v:`€${lr.costo.toFixed(2)}`}]:[]),
+      ...(lr.scad?[{k:'Prossima',v:fmtDate(lr.scad),cls:scadCls(dr)}]:[]),
+    ]:[],dr)+
+    card('🔄','rgba(176,158,255,0.1)','Gomme',`${ld(KEYS.tires).length} cambi`,lt?[
+      {k:'Ultimo cambio',v:fmtDate(lt.data)},{k:'Montate',v:lt.tipo},
+      ...(lt.marca?[{k:'Marca',v:lt.marca}]:[]),
+      ...(lt.misura?[{k:'Misura',v:lt.misura}]:[]),
+      ...(lt.costo?[{k:'Costo',v:`€${lt.costo.toFixed(2)}`}]:[]),
+      ...(lt.scad?[{k:'Prossimo',v:fmtDate(lt.scad),cls:scadCls(dt)}]:[]),
+    ]:[],dt)+
+    card('📋','rgba(71,255,170,0.1)','Bollo',`${ld(KEYS.tax).length} bolli`,lb?[
+      {k:'Anno',v:lb.anno},
+      ...(lb.importo?[{k:'Importo',v:`€${lb.importo.toFixed(2)}`}]:[]),
+      ...(lb.data?[{k:'Pagato il',v:fmtDate(lb.data)}]:[]),
+      ...(lb.scad?[{k:'Scadenza',v:fmtDate(lb.scad),cls:scadCls(db)}]:[]),
+    ]:[],db)+
+    card('🛡️','rgba(255,158,255,0.1)','Assicurazione',`${ld(KEYS.ins).length} polizze`,li?[
+      {k:'Compagnia',v:li.comp||'—'},{k:'Tipo',v:li.tipo},
+      ...(li.importo?[{k:'Importo',v:`€${li.importo.toFixed(2)}`}]:[]),
+      ...(li.inizio?[{k:'Inizio',v:fmtDate(li.inizio)}]:[]),
+      ...(li.scad?[{k:'Scadenza',v:fmtDate(li.scad),cls:scadCls(di)}]:[]),
+      ...(li.numero?[{k:'Polizza N°',v:li.numero}]:[]),
+    ]:[],di);
+}
+
+// ── STORICO CARBURANTE ────────────────────────────────────────────────────────
+function renderStorico(){
+  const arr=ld(KEYS.fuel); const el=document.getElementById('storicoCarburante');
+  if(!arr.length){el.innerHTML='<div class="empty"><div class="icon">📋</div><p>Nessun rifornimento ancora.</p></div>';return;}
+  const rows=calcolaRows(arr);
+  el.innerHTML='<div class="history-list">'+[...rows].reverse().map((r,i)=>`
+    <div class="history-item">
+      <div class="history-header">
+        <div><div class="history-date">${fmtDate(r.data)}</div><div class="history-sub2">${r.tipo} · ${r.km.toLocaleString()} km</div></div>
+        <div class="history-actions">
+          <button class="btn-sm" onclick="apriModifica(${rows.length-1-i})">✏️</button>
+          <button class="btn-sm del" onclick="eliminaRiga(${rows.length-1-i})">✕</button>
+        </div>
+      </div>
+      <div class="history-tags">
+        ${r.kmPercorsi?`<span class="tag" style="color:var(--blue)">🛣 ${r.kmPercorsi.toFixed(0)} km</span>`:''}
+        <span class="tag">${r.litri.toFixed(2)} L</span>
+        <span class="tag" style="color:var(--accent)">💶 €${r.spesa.toFixed(2)}</span>
+        <span class="tag">€${r.pLitro.toFixed(3)}/L</span>
+        ${r.consumo?`<span class="tag" style="color:var(--red)">⛽ ${r.consumo} km/L</span>`:''}
+        ${r.costoKm?`<span class="tag" style="color:var(--purple)">€${r.costoKm.toFixed(3)}/km</span>`:''}
+      </div>
+    </div>`).join('')+'</div>';
+}
+function eliminaRiga(idx){
+  const arr=ld(KEYS.fuel);const sorted=[...arr].sort((a,b)=>new Date(a.data)-new Date(b.data));
+  if(!confirm('Eliminare?'))return;
+  arr.splice(arr.indexOf(sorted[idx]),1);sv(KEYS.fuel,arr);renderStorico();showToast('Rifornimento eliminato');
+}
+
+// ── EXPORT/IMPORT ─────────────────────────────────────────────────────────────
+function esportaCSV(){
+  const arr=ld(KEYS.fuel);if(!arr.length){showToast('Nessun dato');return;}
+  const blob=new Blob(['data,km,litri,prezzoLitro,spesa,tipo\n'+arr.map(r=>`${r.data},${r.km},${r.litri},${r.pLitro},${r.spesa},${r.tipo}`).join('\n')],{type:'text/csv'});
+  const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='carburante_'+today()+'.csv';a.click();showToast('CSV esportato!');
+}
+function leggiCSV(e){
+  const file=e.target.files[0];if(!file)return;
+  const reader=new FileReader();
+  reader.onload=ev=>{
+    const lines=ev.target.result.trim().split('\n').slice(1);const arr=ld(KEYS.fuel);
+    lines.forEach(l=>{const[data,km,litri,pLitro,spesa,tipo]=l.split(',');if(data&&km)arr.push({data,km:+km,litri:+litri,pLitro:+pLitro,spesa:+spesa,tipo:tipo||'Benzina'});});
+    sv(KEYS.fuel,arr);showToast(`${lines.length} righe importate!`);renderStorico();
+  };
+  reader.readAsText(file);e.target.value='';
+}
+
+// INIT
+document.getElementById('inData').value=today();
+renderDashboard();
+</script>
+</body>
+</html>
